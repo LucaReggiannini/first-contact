@@ -26,14 +26,17 @@ DESCRIPTION
 	Tests for MS Office files:
 	1. Macro detection (via oledump, olefile)
 	2. URLs and IPv4 detection
+	4. Blacklisted strings detection 
 
 	Tests for PDF files:
 	1. JavaScript and Action tags (via pdf-parser)
 	2. JBIG2, Flash and XFA forms (via pdf-parser)
 	3. URLs and IPv4 detection
+	4. Blacklisted strings detection 
 
 	Tests for every other file type:
 	1. URLs and IPv4 detection
+	2. Blacklisted strings detection 
 
 URLS DETECTION
 	Extracts URLs from a file using a regular expression.
@@ -56,6 +59,18 @@ IPV4 DETECTION
 
 	Note: this will also match invalid IPv4 like 999.123.120.288
 
+BLACKLISTED STRINGS
+	Simply searches bad strings previously entered in the "blacklist.cfg" (one per line).
+
 OPTIONS
-	-h, --help show this manual
+	-h, --help 
+		show this manual
+
+	-v, --verbose 
+		show more informations during execution
+
+	-p, --preserve-after-extraction
+		Do not delete extracted archives content after analysis.
+		Archive content is extracted in $tmp/first-contact/$archive-name
+
 ```

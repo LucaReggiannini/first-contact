@@ -68,14 +68,17 @@ DESCRIPTION
 	Tests for MS Office files:
 	1. Macro detection (via oledump, olefile)
 	2. URLs and IPv4 detection
+	4. Blacklisted strings detection 
 
 	Tests for PDF files:
 	1. JavaScript and Action tags (via pdf-parser)
 	2. JBIG2, Flash and XFA forms (via pdf-parser)
 	3. URLs and IPv4 detection
+	4. Blacklisted strings detection 
 
 	Tests for every other file type:
 	1. URLs and IPv4 detection
+	2. Blacklisted strings detection 
 
 URLS DETECTION
 	Extracts URLs from a file using a regular expression.
@@ -98,6 +101,9 @@ IPV4 DETECTION
 
 	Note: this will also match invalid IPv4 like 999.123.120.288
 
+BLACKLISTED STRINGS
+	Simply searches bad strings previously entered in the "blacklist.cfg" (one per line).
+
 OPTIONS
 	-h, --help 
 		show this manual
@@ -119,15 +125,22 @@ FOLDER_DEPENDENCIES = os.path.join(os.path.dirname(__file__), "dependencies") # 
 FOLDER_TEMP = os.path.join(__getTmp(), "first-contact") # used to store temp files
 FILE_DEPENDENCIES_OLEDUMP = os.path.join(FOLDER_DEPENDENCIES, "oledump.py")
 FILE_DEPENDENCIES_PDF_PARSER = os.path.join(FOLDER_DEPENDENCIES, "pdf-parser.py")
-FILE_REGEX_IOC_EXCLUSIONS = os.path.join(os.path.dirname(__file__), "whitelist.cfg")
+FILE_PATTERNS_WHITELIST = os.path.join(os.path.dirname(__file__), "whitelist.cfg")
+FILE_STRINGS_BLACKLIST = os.path.join(os.path.dirname(__file__), "blacklist.cfg")
 REGEX_URLS = "([a-zA-Z0-9\+\.\-]+:\/\/.*?)[\<|\>|\"|\{|\}|\||\\|\^|\[|\]|\`|\s|\n]"
 REGEX_IPV4 = "\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}"
-REGEX_IOC_EXCLUSIONS = []
+PATTERNS_WHITELIST = []
+STRINGS_BLACKLIST = []
 
 # Load your whitelisted URLs and IPv4s from "whitelist.cfg"
-with open(FILE_REGEX_IOC_EXCLUSIONS) as file:
+with open(FILE_PATTERNS_WHITELIST) as file:
 	for line in file:
-		REGEX_IOC_EXCLUSIONS.append(line.rstrip())
+		PATTERNS_WHITELIST.append(line.rstrip())
+
+# Load your blacklisted strings from "blacklist.cfg"
+with open(FILE_STRINGS_BLACKLIST) as file:
+	for line in file:
+		STRINGS_BLACKLIST.append(line.rstrip())
 
 def __test_MSO_macro(path):
 	o = __execute(["python3", FILE_DEPENDENCIES_OLEDUMP, path])
@@ -142,9 +155,9 @@ def __test_PDF_objects(path):
 		__info("Interesting content detected")
 
 def __test_ALL_URLS(path):
-	__test_ALL_pattern(path, REGEX_URLS, REGEX_IOC_EXCLUSIONS, "URL")
+	__test_ALL_pattern(path, REGEX_URLS, PATTERNS_WHITELIST, "URL")
 def __test_ALL_IPV4(path):
-	__test_ALL_pattern(path, REGEX_IPV4, REGEX_IOC_EXCLUSIONS, "IPv4")
+	__test_ALL_pattern(path, REGEX_IPV4, PATTERNS_WHITELIST, "IPv4")
 def __test_ALL_pattern(path, pattern, whitelist, label):
 	stream = io.open(
 	path,
@@ -175,13 +188,29 @@ def __test_ALL_pattern(path, pattern, whitelist, label):
 		else:
 			for foundElement in foundElements:
 				__verbose("Pattern " + label + " found (" + foundElement + ") in " + str(path))
-			
+
+def __test_ALL_STRINGS_BLACKLIST(path):
+	stream = io.open(path,
+	mode = "r",	
+	encoding = "utf-8",
+	errors = "surrogateescape")
+
+	fileContent = stream.read()
+
+	for badstring in STRINGS_BLACKLIST:
+		if re.search(badstring, fileContent, re.IGNORECASE):
+			__warning("Bad string '" + badstring + "' found in " + str(path))		
 			
 
 def __test_ARCHIVE(path):
 	# Extract the archive
 	# /$tmp/first-contact/$archive-name
 	extractionDirectory = os.path.join(FOLDER_TEMP, Path(path).stem)
+
+	if Path(extractionDirectory).is_dir():
+		__error("A previous file extraction was found: " + str(extractionDirectory) + ". Analysis stopped: please consider deleting the old folder first")
+		exit()
+
 	__info("Extracting as archive into " + str(extractionDirectory))
 	try:
 		shutil.unpack_archive(path, extractionDirectory)
@@ -199,12 +228,14 @@ def __test_ARCHIVE(path):
 			filePath = os.path.join(root, file)
 			__test_ALL_URLS(filePath)
 			__test_ALL_IPV4(filePath)
+			__test_ALL_STRINGS_BLACKLIST(filePath)
 
 	# Remove extracted files
 	if preserveAfterExtraction == 0:
 		shutil.rmtree(extractionDirectory)
 
 def __main():
+	# Check if at least one argument is passed
 	if len(sys.argv) == 1:
 		__error("No arguments given")
 		__help()
@@ -219,6 +250,7 @@ def __main():
 			verbose = True
 			__verbose("Output is verbose")
 		elif args[0] == "-p" or args[0] == "--preserve-after-extraction":
+			global preserveAfterExtraction
 			preserveAfterExtraction = 1
 		else:
 			file = args[0]
@@ -236,24 +268,29 @@ def __main():
 		__error("Invalid file given")
 		exit()
 
+	# Get file MIME
 	mime = __getMime(file)
 	__verbose("MIME " + mime)
 
+	# Run a test based on the MIME detected
 	if re.search("Microsoft|Word|Excel", mime, re.IGNORECASE):
 		__info("MS Office file detected")
 		__test_MSO_macro(file)
 		__test_ALL_URLS(file)
 		__test_ALL_IPV4(file)
+		__test_ALL_STRINGS_BLACKLIST(file)
 		__test_ARCHIVE(file)
 	elif re.search("PDF", mime, re.IGNORECASE):
 		__info("Portable Document Format file detected")
 		__test_PDF_objects(file)
 		__test_ALL_URLS(file)
 		__test_ALL_IPV4(file)
+		__test_ALL_STRINGS_BLACKLIST(file)
 	else:
-		__info("Unknow file type")
+		__info("Unsupported file type: Performing generic tests")
 		__test_ALL_URLS(file)
 		__test_ALL_IPV4(file)
+		__test_ALL_STRINGS_BLACKLIST(file)
 
 	__info("Analysis complete.")
 if __name__ == "__main__":
