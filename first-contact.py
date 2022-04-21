@@ -17,23 +17,17 @@
 import subprocess
 import sys
 import io
-from pathlib import Path # Used to convert strings to paths
+from pathlib import Path # Used to convert strings to paths, get filenames from paths and check if files exists
 import tempfile # Get temporary directory (cross-platform)
-import os # Used to join paths (cross-platform)
-import mimetypes # Used to detect mime types from extension
-from filemime import filemime # Used to detect mime types from file content
-from re import search
+import os # Used to join paths (cross-platform) and list files through directories
 import re
-
-def __getMimeExt(path):
-	# Get MIME from file extension
-	return mimetypes.MimeTypes().guess_type(path)[0]
+import shutil # Used to extract archives and delete files
+import argparse 
+import magic # Used to detect mime types from file content
 
 def __getMime(path):
-	# Get MIME from file content
-	file = filemime()
-	mime = file.load_file(path)
-	return f"{mime}"
+	mime = magic.Magic(mime=True)
+	return mime.from_file(path)
 
 def __getTmp():
 	# Get temporary directory (cross-platform)
@@ -51,6 +45,9 @@ def __execute(program):
 	stdout = process.communicate()[0]
 	return stdout.decode('ascii', 'replace')
 
+def __verbose(text):
+	if verbose == True:
+		print("Verbose: " + text)
 def __warning(text):
 	print("Warning: " + text)
 def __info(text):
@@ -102,35 +99,46 @@ IPV4 DETECTION
 	Note: this will also match invalid IPv4 like 999.123.120.288
 
 OPTIONS
-	-h, --help show this manual
+	-h, --help 
+		show this manual
+
+	-v, --verbose 
+		show more informations during execution
+
+	-p, --preserve-after-extraction
+		Do not delete extracted archives content after analysis.
+		Archive content is extracted in $tmp/first-contact/$archive-name
+
 	""")
 	sys.exit()
 
+verbose = False
+preserveAfterExtraction = 0
+
 FOLDER_DEPENDENCIES = os.path.join(os.path.dirname(__file__), "dependencies") # Used to store needed components
 FOLDER_TEMP = os.path.join(__getTmp(), "first-contact") # used to store temp files
-
 FILE_DEPENDENCIES_OLEDUMP = os.path.join(FOLDER_DEPENDENCIES, "oledump.py")
 FILE_DEPENDENCIES_PDF_PARSER = os.path.join(FOLDER_DEPENDENCIES, "pdf-parser.py")
 FILE_REGEX_IOC_EXCLUSIONS = os.path.join(os.path.dirname(__file__), "whitelist.cfg")
-
 REGEX_URLS = "([a-zA-Z0-9\+\.\-]+:\/\/.*?)[\<|\>|\"|\{|\}|\||\\|\^|\[|\]|\`|\s|\n]"
 REGEX_IPV4 = "\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}"
 REGEX_IOC_EXCLUSIONS = []
+
 # Load your whitelisted URLs and IPv4s from "whitelist.cfg"
 with open(FILE_REGEX_IOC_EXCLUSIONS) as file:
 	for line in file:
-		REGEX_IOC_EXCLUSIONS.append(line)
+		REGEX_IOC_EXCLUSIONS.append(line.rstrip())
 
 def __test_MSO_macro(path):
-	o = __execute(["python", FILE_DEPENDENCIES_OLEDUMP, path])
-	if search(" M | O | E | \! ", o): # 'm' omitted to prevent false positives
+	o = __execute(["python3", FILE_DEPENDENCIES_OLEDUMP, path])
+	if re.search(" M | O | E | \! ", o): # 'm' omitted to prevent false positives
 		__warning("Macro detected")
 
 def __test_PDF_objects(path):
-	o = __execute(["python", FILE_DEPENDENCIES_PDF_PARSER, "--stats", path])
-	if search("/JS|/JavaScript|/AA|/OpenAction|/Launch", o):
+	o = __execute(["python3", FILE_DEPENDENCIES_PDF_PARSER, "--stats", path])
+	if re.search("/JS|/JavaScript|/AA|/OpenAction|/Launch", o):
 		__warning("Active content detected")
-	if search("/JBIG2Decode|/RichMedia|/XFA", o):
+	if re.search("/JBIG2Decode|/RichMedia|/XFA", o):
 		__info("Interesting content detected")
 
 def __test_ALL_URLS(path):
@@ -147,36 +155,97 @@ def __test_ALL_pattern(path, pattern, whitelist, label):
 	fileContent = stream.read()
 
 	matches = re.findall(pattern, fileContent)
+	matches = list(dict.fromkeys(matches)) # Remove duplicates
+
+	foundElements = []
+
 	if matches:
 		for match in matches:
 			for exclusion in whitelist:
-				# If one of the pattern matched is not in the whitelist
-				# Consider it as possible malicious
-				if not exclusion in match:
-					print(exclusion + " " + match)
-					__info(label + " scheme detected")
+				if exclusion in match:
 					break
 			else:
-				continue
-			break
+				foundElements.append(match) 
+
+	foundElements = list(dict.fromkeys(foundElements)) # Remove duplicates
+
+	if foundElements:
+		if verbose == False:
+			__info(label + " scheme detected in " + path)
+		else:
+			for foundElement in foundElements:
+				__verbose("Pattern " + label + " found (" + foundElement + ") in " + str(path))
+			
+			
+
+def __test_ARCHIVE(path):
+	# Extract the archive
+	# /$tmp/first-contact/$archive-name
+	extractionDirectory = os.path.join(FOLDER_TEMP, Path(path).stem)
+	__info("Extracting as archive into " + str(extractionDirectory))
+	try:
+		shutil.unpack_archive(path, extractionDirectory)
+	except: # If can not detect archive format, try ZIP
+		try:
+			shutil.unpack_archive(path, extractionDirectory, "zip")
+		except:
+			__error("Can not extract as archive.")
+			return
+
+	# Get file list from directory recursively
+	filesList = []
+	for root, dirs, files in os.walk(extractionDirectory):
+		for file in files:
+			filePath = os.path.join(root, file)
+			__test_ALL_URLS(filePath)
+			__test_ALL_IPV4(filePath)
+
+	# Remove extracted files
+	if preserveAfterExtraction == 0:
+		shutil.rmtree(extractionDirectory)
 
 def __main():
 	if len(sys.argv) == 1:
-		error("No arguments given")
+		__error("No arguments given")
 		__help()
-	if sys.argv[1] == "-h" or sys.argv[1] == "--help":
-		__help()
+	
+	# Parse arguments bu shift
+	args = sys.argv[1:]
+	while len(args):
+		if args[0] == "-h" or args[0] == "--help":
+			__help()
+		elif args[0] == "-v" or args[0] == "--verbose":
+			global verbose 
+			verbose = True
+			__verbose("Output is verbose")
+		elif args[0] == "-p" or args[0] == "--preserve-after-extraction":
+			preserveAfterExtraction = 1
+		else:
+			file = args[0]
+		args = args[1:] # shift
 
-	file = sys.argv[1]
-	file = Path(file)
+	# Check if file parameter is populated
+	try:
+		file = Path(file)
+	except:
+		__error("Invalid file given")
+		exit()
+
+	# Check if file exists
+	if not Path(file).is_file():
+		__error("Invalid file given")
+		exit()
+
 	mime = __getMime(file)
+	__verbose("MIME " + mime)
 
-	if search("Microsoft|Word|Excel", mime):
+	if re.search("Microsoft|Word|Excel", mime, re.IGNORECASE):
 		__info("MS Office file detected")
 		__test_MSO_macro(file)
 		__test_ALL_URLS(file)
 		__test_ALL_IPV4(file)
-	elif search("PDF", mime):
+		__test_ARCHIVE(file)
+	elif re.search("PDF", mime, re.IGNORECASE):
 		__info("Portable Document Format file detected")
 		__test_PDF_objects(file)
 		__test_ALL_URLS(file)
@@ -186,5 +255,6 @@ def __main():
 		__test_ALL_URLS(file)
 		__test_ALL_IPV4(file)
 
+	__info("Analysis complete.")
 if __name__ == "__main__":
 	__main()
