@@ -17,20 +17,22 @@
 import subprocess
 import sys
 import io
-from pathlib import Path # Used to convert strings to paths, get filenames from paths and check if files exists
-import tempfile # Get temporary directory (cross-platform)
-import os # Used to join paths (cross-platform) and list files through directories
+from   pathlib import Path # Used to convert strings to paths, get filenames from paths and check if files exists
+import tempfile            # Get temporary directory (cross-platform)
+import os                  # Used to join paths (cross-platform) and list files through directories
 import re
-import shutil # Used to extract archives and delete files
-import argparse 
-import magic # Used to detect mime types from file content
+import shutil              # Used to extract archives and delete files
+import argparse
+import magic               # Used to detect mime types from file content
+import requests            # Used to perform HTTP requests
+import json
+import hashlib             # Used to calculate file hashes
 
 def __getMime(path):
 	mime = magic.Magic(mime=True)
 	return mime.from_file(path)
 
 def __getTmp():
-	# Get temporary directory (cross-platform)
 	return tempfile.gettempdir()
 
 def __execute(program):
@@ -45,22 +47,28 @@ def __execute(program):
 	stdout = process.communicate()[0]
 	return stdout.decode('ascii', 'replace')
 
+
+def __alert(text):
+	print("Alert       : " + text)
+def __warning(text):
+	print("Warning     : " + text)
+def __info(text):
+	print("Info        : " + text)
+def __error(text):
+	print("Error       : " + text, file = sys.stderr)
 def __verbose(text):
 	if verbose == True:
-		print("Verbose: " + text)
-def __warning(text):
-	print("Warning: " + text)
-def __info(text):
-	print("Info: " + text)
-def __error(text):
-	print("Error: " + text, file = sys.stderr)
+		print("Verbose     : " + text)
+def __debug(text):
+	if debug == True:
+		print("Debug       : " + text)
 
 def __help():
 	print("""
 first-contact
 
 SYNOPSIS
-	first-contact [OPTION] FILE
+	first-contact [OPTIONS...] [FILE]
 
 DESCRIPTION
 	Shows evidence of possible malware infection within some file types
@@ -111,26 +119,46 @@ OPTIONS
 	-v, --verbose 
 		show more informations during execution
 
-	-p, --preserve-after-extraction
+	-d, --debug
+		show debugging informations
+
+	-c, --checksum
+		Calculate file MD5, SHA1 and SHA256
+
+	-k, --keep-after-extraction
 		Do not delete extracted archives content after analysis.
 		Archive content is extracted in $tmp/first-contact/$archive-name
+
+	-V, --virustotal [API_KEY]
+		Get VirusTotal report for given [FILE].
+		If the file it is not submitted no data will not be uploaded
+	
+	-Vun, --virustotal-unlimited-names
+		In the VirusTotal report shows all the names with which the file has been submitted or seen in the wild 
+		If this option is not activated the limit is 10 names.
 
 	""")
 	sys.exit()
 
-verbose = False
-preserveAfterExtraction = 0
+##########################################################################################
 
-FOLDER_DEPENDENCIES = os.path.join(os.path.dirname(__file__), "dependencies") # Used to store needed components
-FOLDER_TEMP = os.path.join(__getTmp(), "first-contact") # used to store temp files
-FILE_DEPENDENCIES_OLEDUMP = os.path.join(FOLDER_DEPENDENCIES, "oledump.py")
+# GENERIC VARS AND CONST
+
+verbose                      = False
+debug                        = False
+keepAfterExtraction          = False
+printChecksum                = False
+
+FOLDER_DEPENDENCIES          = os.path.join(os.path.dirname(__file__), "dependencies") # Used to store needed components
+FOLDER_TEMP                  = os.path.join(__getTmp(), "first-contact")               # used to store temp files
+FILE_DEPENDENCIES_OLEDUMP    = os.path.join(FOLDER_DEPENDENCIES, "oledump.py")
 FILE_DEPENDENCIES_PDF_PARSER = os.path.join(FOLDER_DEPENDENCIES, "pdf-parser.py")
-FILE_PATTERNS_WHITELIST = os.path.join(os.path.dirname(__file__), "whitelist.cfg")
-FILE_STRINGS_BLACKLIST = os.path.join(os.path.dirname(__file__), "blacklist.cfg")
-REGEX_URLS = "([a-zA-Z0-9\+\.\-]+:\/\/.*?)[\<|\>|\"|\{|\}|\||\\|\^|\[|\]|\`|\s|\n]"
-REGEX_IPV4 = "\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}"
-PATTERNS_WHITELIST = []
-STRINGS_BLACKLIST = []
+FILE_PATTERNS_WHITELIST      = os.path.join(os.path.dirname(__file__), "whitelist.cfg")
+FILE_STRINGS_BLACKLIST       = os.path.join(os.path.dirname(__file__), "blacklist.cfg")
+REGEX_URLS                   = "([a-zA-Z0-9\+\.\-]+:\/\/.*?)[\<|\>|\"|\{|\}|\||\\|\^|\[|\]|\`|\s|\n]"
+REGEX_IPV4                   = "\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}"
+PATTERNS_WHITELIST           = []
+STRINGS_BLACKLIST            = []
 
 # Load your whitelisted URLs and IPv4s from "whitelist.cfg"
 with open(FILE_PATTERNS_WHITELIST) as file:
@@ -142,33 +170,45 @@ with open(FILE_STRINGS_BLACKLIST) as file:
 	for line in file:
 		STRINGS_BLACKLIST.append(line.rstrip())
 
-def __test_MSO_macro(path):
+##########################################################################################
+
+# VIRUSTOTAL VARS AND CONST
+
+URL_VIRUSTOTAL               = 'https://www.virustotal.com/vtapi/v2/file/report'
+virustotalEnabled            = False # Set to True if you want to perform a scan
+virustotalApiKey             =  ""
+virustotalResource           =  ""
+virustotalUnlimitedNames     = False
+
+##########################################################################################
+
+# TEST FUNCTIONS 
+
+def __test_MSO_macros(path):
 	o = __execute(["python3", FILE_DEPENDENCIES_OLEDUMP, path])
 	if re.search(" M | O | E | \! ", o): # 'm' omitted to prevent false positives
-		__warning("Macro detected")
+		__alert("Macro detected")
 
 def __test_PDF_objects(path):
 	o = __execute(["python3", FILE_DEPENDENCIES_PDF_PARSER, "--stats", path])
 	if re.search("/JS|/JavaScript|/AA|/OpenAction|/Launch", o):
-		__warning("Active content detected")
+		__alert("Active content detected")
 	if re.search("/JBIG2Decode|/RichMedia|/XFA", o):
-		__info("Interesting content detected")
+		__warning("Interesting content detected")
 
-def __test_ALL_URLS(path):
-	__test_ALL_pattern(path, REGEX_URLS, PATTERNS_WHITELIST, "URL")
-def __test_ALL_IPV4(path):
+def __test_ALL_patterns(path):
 	__test_ALL_pattern(path, REGEX_IPV4, PATTERNS_WHITELIST, "IPv4")
+	__test_ALL_pattern(path, REGEX_URLS, PATTERNS_WHITELIST, "URL")
 def __test_ALL_pattern(path, pattern, whitelist, label):
-	stream = io.open(
+	stream      = io.open(
 	path,
-	mode = "r",	
-	encoding = "utf-8",
-	errors = "surrogateescape")
-
+	mode        = "r",	
+	encoding    = "utf-8",
+	errors      = "surrogateescape")
 	fileContent = stream.read()
 
-	matches = re.findall(pattern, fileContent)
-	matches = list(dict.fromkeys(matches)) # Remove duplicates
+	matches  = re.findall(pattern, fileContent)
+	matches  = list(dict.fromkeys(matches)) # Remove duplicates
 
 	foundElements = []
 
@@ -181,7 +221,6 @@ def __test_ALL_pattern(path, pattern, whitelist, label):
 				foundElements.append(match) 
 
 	foundElements = list(dict.fromkeys(foundElements)) # Remove duplicates
-
 	if foundElements:
 		if verbose == False:
 			__info(label + " scheme detected in " + path)
@@ -189,24 +228,20 @@ def __test_ALL_pattern(path, pattern, whitelist, label):
 			for foundElement in foundElements:
 				__verbose("Pattern " + label + " found (" + foundElement + ") in " + str(path))
 
-def __test_ALL_STRINGS_BLACKLIST(path):
-	stream = io.open(path,
-	mode = "r",	
-	encoding = "utf-8",
-	errors = "surrogateescape")
-
+def __test_ALL_strings(path):
+	stream      = io.open(path,
+	mode        = "r",	
+	encoding    = "utf-8",
+	errors      = "surrogateescape")
 	fileContent = stream.read()
 
 	for badstring in STRINGS_BLACKLIST:
 		if re.search(badstring, fileContent, re.IGNORECASE):
 			__warning("Bad string '" + badstring + "' found in " + str(path))		
 			
-
 def __test_ARCHIVE(path):
-	# Extract the archive
-	# /$tmp/first-contact/$archive-name
+	# Extract the archive in /$tmp/first-contact/$archive-name
 	extractionDirectory = os.path.join(FOLDER_TEMP, Path(path).stem)
-
 	if Path(extractionDirectory).is_dir():
 		__error("A previous file extraction was found: " + str(extractionDirectory) + ". Analysis stopped: please consider deleting the old folder first")
 		exit()
@@ -226,13 +261,93 @@ def __test_ARCHIVE(path):
 	for root, dirs, files in os.walk(extractionDirectory):
 		for file in files:
 			filePath = os.path.join(root, file)
-			__test_ALL_URLS(filePath)
-			__test_ALL_IPV4(filePath)
-			__test_ALL_STRINGS_BLACKLIST(filePath)
+			__test_ALL_patterns(filePath)
+			__test_ALL_strings(filePath)
 
 	# Remove extracted files
-	if preserveAfterExtraction == 0:
+	if keepAfterExtraction == False:
 		shutil.rmtree(extractionDirectory)
+
+##########################################################################################
+
+# VIRUSTOTAL REPORT
+
+def __getVirustotalReport(hash):
+	httpPostData = {
+    'apikey': virustotalApiKey,
+    'resource': hash,
+    'allinfo' : 'true'
+    }
+ 
+	httpResponse = requests.post(URL_VIRUSTOTAL, data = httpPostData)
+
+	print("\nVirusTotal report\n")
+	__debug(httpResponse.text)
+	if httpResponse.status_code == 200:
+		try:
+			j = json.loads(httpResponse.text)
+			fileStatus = int(j["response_code"])
+			if fileStatus == 1:
+				print("Name        : " + str(j["submission_names"][0]) + "\n")
+				print("Detections  : " + str(j["positives"]) + "/" + str(j["total"]))
+				print("Reputation  : " + str(j["community_reputation"]) + " (-100 is fully malicious, 100 is fully harmless)\n")
+				print("Last  scan  : " + str(j["scan_date"]))
+				print("First seen  : " + str(j["first_seen"]) + "\n")
+				print("Other names : \n")
+				if virustotalUnlimitedNames == True:
+					for name in j["submission_names"]:
+						print("             " + name)
+				else:
+					for name in j["submission_names"][:10]:
+						print("             " + name)
+			elif fileStatus == 0:
+					print("The item you searched for was not present in VirusTotal's dataset")
+			elif fileStatus == -2:
+					print("The requested item is still queued for analysis")
+			else:
+					print("Unknow file status " + fileStatus + ".")
+		except Exception as e:
+			__debug(e)
+			__error("error parsing JSON data")
+
+	elif httpResponse.status_code == 204:
+		print("Request rate limit exceeded. You are making more requests than allowed. You have exceeded one of your quotas (minute, daily or monthly). Daily quotas are reset every day at 00:00 UTC.")
+	elif httpResponse.status_code == 400:
+		print("Bad request. Your request was somehow incorrect. This can be caused by missing arguments or arguments with wrong values.")
+	elif httpResponse.status_code == 403:
+		print("Forbidden. You don't have enough privileges to make the request. You may be doing a request without providing an API key or you may be making a request to a Private API without having the appropriate privileges.")
+	else:
+		print("Unknow error " +  httpResponse.status_code + ".")
+
+	print("")
+
+##########################################################################################
+
+# CALCULATE FILE HASH
+
+def __getHash(path):
+	if not os.path.exists(path):
+		__error("Invalid file given")
+		exit()
+
+	with open(path, 'rb') as f:
+		sha1   = hashlib.sha1()
+		sha256 = hashlib.sha256()
+		md5    = hashlib.md5()
+
+		while True:
+			chunk = f.read(16 * 1024)
+			if not chunk:
+				break
+			sha1.update(chunk)
+			sha256.update(chunk)
+			md5.update(chunk)
+
+		return str(md5.hexdigest()), str(sha1.hexdigest()), str(sha256.hexdigest());
+
+##########################################################################################
+
+# START 
 
 def __main():
 	# Check if at least one argument is passed
@@ -240,18 +355,37 @@ def __main():
 		__error("No arguments given")
 		__help()
 	
-	# Parse arguments bu shift
+	# Parse arguments by shift
 	args = sys.argv[1:]
 	while len(args):
-		if args[0] == "-h" or args[0] == "--help":
+		if args[0]   == "-h" or args[0] == "--help":
 			__help()
 		elif args[0] == "-v" or args[0] == "--verbose":
 			global verbose 
 			verbose = True
-			__verbose("Output is verbose")
-		elif args[0] == "-p" or args[0] == "--preserve-after-extraction":
-			global preserveAfterExtraction
-			preserveAfterExtraction = 1
+			__verbose("verbose output enabled")
+		elif args[0] == "-d" or args[0] == "--debug":
+			global debug 
+			debug = True
+			__debug("debug output enabled")
+		elif args[0] == "-k" or args[0] == "--keep-after-extraction":
+			global keepAfterExtraction
+			keepAfterExtraction = True
+		elif args[0] == "-c" or args[0] == "--checksum":
+			global printChecksum
+			printChecksum = True
+		elif args[0] == "-V" or args[0] == "--virustotal":
+			if not args[1] is None:
+				global virustotalApiKey
+				virustotalApiKey = args[1]
+				global virustotalEnabled
+				virustotalEnabled = True
+				args = args[1:] # additional shift
+			else:
+				__error("VirustTotal API Key not given.")
+		elif args[0] == "-Vun" or args[0] == "--virustotal-unlimited-names":
+			global virustotalUnlimitedNames
+			virustotalUnlimitedNames = True
 		else:
 			file = args[0]
 		args = args[1:] # shift
@@ -261,37 +395,48 @@ def __main():
 		file = Path(file)
 	except:
 		__error("Invalid file given")
-		exit()
+		__help()
 
 	# Check if file exists
 	if not Path(file).is_file():
 		__error("Invalid file given")
-		exit()
+		__help()
+
+	print("")
+
+	if printChecksum:
+		md5, sha1, sha256 = __getHash(file)
+		print("NAME        : " + os.path.basename(file))
+		print("MD5         : " + md5)
+		print("SHA1        : " + sha1)
+		print("SHA256      : " + sha256)
+		print("")
+
+	if virustotalEnabled:
+		md5, sha1, sha256 = __getHash(file)
+		__getVirustotalReport(md5)
 
 	# Get file MIME
 	mime = __getMime(file)
-	__verbose("MIME " + mime)
+	__debug("MIME " + mime)
 
 	# Run a test based on the MIME detected
 	if re.search("Microsoft|Word|Excel", mime, re.IGNORECASE):
 		__info("MS Office file detected")
-		__test_MSO_macro(file)
-		__test_ALL_URLS(file)
-		__test_ALL_IPV4(file)
-		__test_ALL_STRINGS_BLACKLIST(file)
+		__test_MSO_macros(file)
+		__test_ALL_patterns(file)
+		__test_ALL_strings(file)
 		__test_ARCHIVE(file)
 	elif re.search("PDF", mime, re.IGNORECASE):
 		__info("Portable Document Format file detected")
 		__test_PDF_objects(file)
-		__test_ALL_URLS(file)
-		__test_ALL_IPV4(file)
-		__test_ALL_STRINGS_BLACKLIST(file)
+		__test_ALL_patterns(file)
+		__test_ALL_strings(file)
 	else:
 		__info("Unsupported file type: Performing generic tests")
-		__test_ALL_URLS(file)
-		__test_ALL_IPV4(file)
-		__test_ALL_STRINGS_BLACKLIST(file)
+		__test_ALL_patterns(file)
+		__test_ALL_strings(file)
 
-	__info("Analysis complete.")
+	__info("Analysis complete.\n")
 if __name__ == "__main__":
 	__main()
