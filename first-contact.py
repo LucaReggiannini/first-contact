@@ -47,6 +47,20 @@ def __execute(program):
 	stdout = process.communicate()[0]
 	return stdout.decode('ascii', 'replace')
 
+def __loadList(file, list):
+	# Populate a list with file lines
+	with open(file) as f:
+		for line in f:
+			list.append(line.rstrip())
+
+def __getFileContent(path):
+	stream      = io.open(path,
+	mode        = "r",	
+	encoding    = "utf-8",
+	errors      = "surrogateescape")
+	fileContent = stream.read()
+
+	return fileContent
 
 def __alert(text):
 	print("Alert       : " + text)
@@ -75,33 +89,51 @@ DESCRIPTION
 
 	Tests for MS Office files:
 	1. Macro detection (via oledump, olefile)
-	2. URLs and IPv4 detection
-	4. Blacklisted strings detection 
+	2. URLs, IPv4 and Domains detection
+	3. Blacklisted strings detection 
+	4. Extraction as archive and perform generic tests for every files
 
 	Tests for PDF files:
 	1. JavaScript and Action tags (via pdf-parser)
 	2. JBIG2, Flash and XFA forms (via pdf-parser)
-	3. URLs and IPv4 detection
+	3. URLs, IPv4 and Domains detection
 	4. Blacklisted strings detection 
 
-	Tests for every other file type:
-	1. URLs and IPv4 detection
+	Generic tests (for every other file type):
+	1. URLs, IPv4 and Domains detection
 	2. Blacklisted strings detection 
+	3. Extraction as archive and perform generic tests for every files
 
 URLS DETECTION
 	Extracts URLs from a file using a regular expression.
 	This Regex is based on a superficial interpretation of RFC1738 (see: https://datatracker.ietf.org/doc/html/rfc1738) so it may not work on all types of data.
-	Use this script at your own risk and verify if the matches are correct!
 
 	Matches <scheme>://<scheme-specific-part> (two slashes have been added to the RFC definition).
 	Scheme names consist of letters "a"--"z" (not case sensitive), digits, and the following characters "+", ".", "-".
 	Scheme specific part can be everything until a non safe character (defined in RFC) is matched: "<", ">", "{", "}", "|", "\", "^", "[", "]", "`".
 	Omitted safe character are: "%", "#" and "~". They can be used to obfuscate malicious payloads into working URLs.
 
-	If you want some specific results to be excluded from the match, insert them in the "whitelist.cfg" file (one per line).
-	For example, put "raw.githubusercontent.com" to excluded it from URL pattern match.
+	If you want some specific results to be excluded from the match, insert them in the "./cfg/whitelistUrls.cfg" file (one per line).
+	For example, put "https://raw.githubusercontent.com" to excluded it from URL pattern match (every match that contains this string will be excluded!).
 
-	Note: this detection process is simply based on a regular expression so, ofcourse, it will NOT detect splitted URLs (for example an URL splitted in various Sheets and "re-assembled" runtime by an Excel 4.0 Macro).
+DOMAIN DETECTION
+	Extract all domains from a file using a regular expression.
+	This Regex in based on a superficial interpretation of RFC1034(see: https://www.ietf.org/rfc/rfc1034.txt, http://www.tcpipguide.com/free/t_DNSLabelsNamesandSyntaxRules.htm) so it may not work on all types of data.
+	
+	Matches <label-N>.<label>.<tld>.
+	Labels consists of letters "a"--"z" (not case sensitive), digits, and the character "-"; maximum length is 63 chars.
+	Labels are separated by the character "."
+	The last label must be followed by the TLD.
+	The TLD consists of letters "a"--"z" (not case sensitive), digits, and the character "-"; maximum length is 63 chars.
+	Valid TLDs must be inserted in ./cfg/tlds.cfg (current list last updated on 26-04-2022).
+	If a TLD is not in this config file the domain will not match (necessary to prevent most matches with filenames whose form is similar to that of a domain name).
+	For a list of valid TLDs see https://www.iana.org/domains/root/db
+
+	Since this pattern can easily match some filenames or strings contained in binary files, domain search is disabled by default to avoid false positives.
+	Use option "-d" or "--domains" to enable this function.
+	
+	If you want some specific results to be excluded from the match, insert them in the "./cfg/whitelistDomains.cfg" file (one per line).
+	For example, put "raw.githubusercontent.com" to excluded it from URL pattern match.
 
 IPV4 DETECTION
 	Extracts IPv4 from a file using a regular expression.
@@ -109,8 +141,13 @@ IPV4 DETECTION
 
 	Note: this will also match invalid IPv4 like 999.123.120.288
 
+	If you want some specific results to be excluded from the match, insert them in the "./cfg/whitelistIpv4.cfg" file (one per line).
+	For example, put "127.0.0.1" to excluded it from IPv4 pattern match.
+
 BLACKLISTED STRINGS
-	Simply searches bad strings previously entered in the "blacklist.cfg" (one per line).
+	Simply searches bad strings (case insensitive) previously entered in the "./cfg/blacklist.cfg" (one per line).
+
+Note: every detections system based on strings or Regex will NOT detect splitted data (for example an URL splitted in various Sheets and "re-assembled" runtime by an Excel 4.0 Macro will not be detected).
 
 OPTIONS
 	-h, --help 
@@ -124,6 +161,12 @@ OPTIONS
 
 	-c, --checksum
 		Calculate file MD5, SHA1 and SHA256
+
+	-D, --domains
+		Enable Domains detection
+
+	-f, --force-mime [MIME]
+		Set file MIME manually (automatic MIME detection will be ignored)
 
 	-k, --keep-after-extraction
 		Do not delete extracted archives content after analysis.
@@ -148,27 +191,41 @@ verbose                      = False
 debug                        = False
 keepAfterExtraction          = False
 printChecksum                = False
+domainsDetection             = False
+forceMime                    = False
+forcedMime                   = ""
 
-FOLDER_DEPENDENCIES          = os.path.join(os.path.dirname(__file__), "dependencies") # Used to store needed components
-FOLDER_TEMP                  = os.path.join(__getTmp(), "first-contact")               # used to store temp files
+FOLDER_DEPENDENCIES          = os.path.join(os.path.dirname(__file__), "dependencies")                                                 # Used to store needed components
+FOLDER_TEMP                  = os.path.join(__getTmp(), "first-contact")                                                               # used to store temp files
+
 FILE_DEPENDENCIES_OLEDUMP    = os.path.join(FOLDER_DEPENDENCIES, "oledump.py")
 FILE_DEPENDENCIES_PDF_PARSER = os.path.join(FOLDER_DEPENDENCIES, "pdf-parser.py")
-FILE_PATTERNS_WHITELIST      = os.path.join(os.path.dirname(__file__), "whitelist.cfg")
-FILE_STRINGS_BLACKLIST       = os.path.join(os.path.dirname(__file__), "blacklist.cfg")
+
+FILE_WHITELIST_URLS          = os.path.join(os.path.dirname(__file__), "cfg", "whitelistUrls.cfg")
+FILE_WHITELIST_IPV4          = os.path.join(os.path.dirname(__file__), "cfg", "whitelistIpv4.cfg")
+FILE_WHITELIST_DOMAINS       = os.path.join(os.path.dirname(__file__), "cfg", "whitelistDomains.cfg")
+FILE_BLACKLIST_STRINGS       = os.path.join(os.path.dirname(__file__), "cfg", "blacklist.cfg")
+FILE_DOMAINS_TLDS            = os.path.join(os.path.dirname(__file__), "cfg", "tlds.cfg")
+
+FILE_PYTHON                  = "python3"                                                                                               # Specify your Python executable (basename or path)
+
 REGEX_URLS                   = "([a-zA-Z0-9\+\.\-]+:\/\/.*?)[\<|\>|\"|\{|\}|\||\\|\^|\[|\]|\`|\s|\n]"
 REGEX_IPV4                   = "\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}"
-PATTERNS_WHITELIST           = []
-STRINGS_BLACKLIST            = []
+REGEX_DOMAINS                = "((?:(?<!\w)[a-zA-Z0-9\-]{1,63}\.)*(?:(?<!\w)[a-zA-Z0-9\-]{1,63})(?:\.(?:[a-zA-Z0-9\-]{1,63})(?!\w)))"  # /http(?:s)?:\/\/(?:[\w-]+\.)*([\w-]{1,63})(?:\.(?:\w{3}|\w{2}))(?:$|\/)/i
 
-# Load your whitelisted URLs and IPv4s from "whitelist.cfg"
-with open(FILE_PATTERNS_WHITELIST) as file:
-	for line in file:
-		PATTERNS_WHITELIST.append(line.rstrip())
+WHITELIST_URLS          = []
+WHITELIST_IPV4          = []
+WHITELIST_DOMAINS       = []
+BLACKLIST_STRINGS       = []
+DOMAINS_TLDS            = []
 
-# Load your blacklisted strings from "blacklist.cfg"
-with open(FILE_STRINGS_BLACKLIST) as file:
-	for line in file:
-		STRINGS_BLACKLIST.append(line.rstrip())
+# Populate lists with cfg files content
+
+__loadList(FILE_WHITELIST_URLS,    WHITELIST_URLS)
+__loadList(FILE_WHITELIST_IPV4,    WHITELIST_IPV4)
+__loadList(FILE_WHITELIST_DOMAINS, WHITELIST_DOMAINS)
+__loadList(FILE_BLACKLIST_STRINGS, BLACKLIST_STRINGS)
+__loadList(FILE_DOMAINS_TLDS,      DOMAINS_TLDS)
 
 ##########################################################################################
 
@@ -185,33 +242,32 @@ virustotalUnlimitedNames     = False
 # TEST FUNCTIONS 
 
 def __test_MSO_macros(path):
-	o = __execute(["python3", FILE_DEPENDENCIES_OLEDUMP, path])
-	if re.search(" M | O | E | \! ", o): # 'm' omitted to prevent false positives
-		__alert("Macro detected")
+	o = __execute([FILE_PYTHON, FILE_DEPENDENCIES_OLEDUMP, path])
+	__debug(o)
+	if not re.search("no OLE file was found", o):
+		if re.search(" M | O | E | \! ", o): # 'm' omitted to prevent false positives
+			__alert("Macro detected")
+		else:
+			__warning("Possible active content found")
 
 def __test_PDF_objects(path):
-	o = __execute(["python3", FILE_DEPENDENCIES_PDF_PARSER, "--stats", path])
+	o = __execute([FILE_PYTHON, FILE_DEPENDENCIES_PDF_PARSER, "--stats", path])
+	__debug(o)
 	if re.search("/JS|/JavaScript|/AA|/OpenAction|/Launch", o):
 		__alert("Active content detected")
 	if re.search("/JBIG2Decode|/RichMedia|/XFA", o):
 		__warning("Interesting content detected")
 
 def __test_ALL_patterns(path):
-	__test_ALL_pattern(path, REGEX_IPV4, PATTERNS_WHITELIST, "IPv4")
-	__test_ALL_pattern(path, REGEX_URLS, PATTERNS_WHITELIST, "URL")
+	__test_ALL_pattern(path, REGEX_IPV4, WHITELIST_IPV4, "IPv4")
+	__test_ALL_pattern(path, REGEX_URLS, WHITELIST_URLS, "URL")
+	__test_ALL_domains(path, REGEX_DOMAINS, DOMAINS_TLDS, WHITELIST_DOMAINS)
 def __test_ALL_pattern(path, pattern, whitelist, label):
-	stream      = io.open(
-	path,
-	mode        = "r",	
-	encoding    = "utf-8",
-	errors      = "surrogateescape")
-	fileContent = stream.read()
-
+	fileContent = __getFileContent(path)
 	matches  = re.findall(pattern, fileContent)
 	matches  = list(dict.fromkeys(matches)) # Remove duplicates
 
 	foundElements = []
-
 	if matches:
 		for match in matches:
 			for exclusion in whitelist:
@@ -223,22 +279,45 @@ def __test_ALL_pattern(path, pattern, whitelist, label):
 	foundElements = list(dict.fromkeys(foundElements)) # Remove duplicates
 	if foundElements:
 		if verbose == False:
-			__info(label + " scheme detected in " + path)
+			__info(label + " scheme detected in " + path) 
 		else:
 			for foundElement in foundElements:
 				__verbose("Pattern " + label + " found (" + foundElement + ") in " + str(path))
 
-def __test_ALL_strings(path):
-	stream      = io.open(path,
-	mode        = "r",	
-	encoding    = "utf-8",
-	errors      = "surrogateescape")
-	fileContent = stream.read()
+def __test_ALL_domains(path, pattern, tlds, whitelist):
+	# If domains Detection is not enabled by the user exit the function immediately
+	if not domainsDetection:
+		return
 
-	for badstring in STRINGS_BLACKLIST:
+	fileContent = __getFileContent(path)
+	matches  = re.findall(pattern, fileContent)
+	matches  = list(dict.fromkeys(matches)) # Remove duplicates
+
+	foundElements = []
+	if matches:
+		for match in matches:
+			for tld in tlds:
+				if match.endswith(tld):
+					for exclusion in whitelist:
+						if exclusion in match:
+							break
+					else:
+						foundElements.append(match)
+
+	foundElements = list(dict.fromkeys(foundElements)) # Remove duplicates
+	if foundElements:
+		if verbose == False:
+			__info("Domain scheme detected in " + str(path))
+		else:
+			for foundElement in foundElements:
+				__verbose("Pattern Domain found (" + foundElement + ") in " + str(path))
+
+def __test_ALL_strings(path):
+	fileContent = __getFileContent(path)
+	for badstring in BLACKLIST_STRINGS:
 		if re.search(badstring, fileContent, re.IGNORECASE):
-			__warning("Bad string '" + badstring + "' found in " + str(path))		
-			
+			__warning("Bad string '" + badstring + "' found in " + str(path))
+
 def __test_ARCHIVE(path):
 	# Extract the archive in /$tmp/first-contact/$archive-name
 	extractionDirectory = os.path.join(FOLDER_TEMP, Path(path).stem)
@@ -246,7 +325,7 @@ def __test_ARCHIVE(path):
 		__error("A previous file extraction was found: " + str(extractionDirectory) + ". Analysis stopped: please consider deleting the old folder first")
 		exit()
 
-	__info("Extracting as archive into " + str(extractionDirectory))
+	__verbose("Extracting as archive into " + str(extractionDirectory))
 	try:
 		shutil.unpack_archive(path, extractionDirectory)
 	except: # If can not detect archive format, try ZIP
@@ -368,6 +447,18 @@ def __main():
 			global debug 
 			debug = True
 			__debug("debug output enabled")
+		elif args[0] == "-D" or args[0] == "--domains":
+			global domainsDetection 
+			domainsDetection = True
+		elif args[0] == "-f" or args[0] == "--force-mime":
+			if not args[1] is None:
+				global forceMime
+				global forcedMime 
+				forceMime = True
+				forcedMime = args[1]
+				args = args[1:] # additional shift
+			else:
+				__error("No MIME given.")
 		elif args[0] == "-k" or args[0] == "--keep-after-extraction":
 			global keepAfterExtraction
 			keepAfterExtraction = True
@@ -418,10 +509,15 @@ def __main():
 
 	# Get file MIME
 	mime = __getMime(file)
-	__debug("MIME " + mime)
+	__debug("MIME found " + mime)
+
+	# If forced MIME is enabled, overwrite detected MIME
+	if forceMime:
+		mime = forcedMime
+		__verbose("forcing MIME " + mime)
 
 	# Run a test based on the MIME detected
-	if re.search("Microsoft|Word|Excel", mime, re.IGNORECASE):
+	if re.search("Word|Excel|openxmlformats", mime, re.IGNORECASE):
 		__info("MS Office file detected")
 		__test_MSO_macros(file)
 		__test_ALL_patterns(file)
@@ -436,6 +532,7 @@ def __main():
 		__info("Unsupported file type: Performing generic tests")
 		__test_ALL_patterns(file)
 		__test_ALL_strings(file)
+		__test_ARCHIVE(file)
 
 	__info("Analysis complete.\n")
 if __name__ == "__main__":
