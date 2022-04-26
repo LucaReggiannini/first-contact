@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 first-contact
 
 SYNOPSIS
-	first-contact [OPTION] FILE
+	first-contact [OPTIONS...] [FILE]
 
 DESCRIPTION
 	Shows evidence of possible malware infection within some file types
@@ -69,8 +69,22 @@ OPTIONS
 	-v, --verbose 
 		show more informations during execution
 
-	-p, --preserve-after-extraction
+	-d, --debug
+		show debugging informations
+
+	-c, --checksum
+		Calculate file MD5, SHA1 and SHA256
+
+	-k, --keep-after-extraction
 		Do not delete extracted archives content after analysis.
 		Archive content is extracted in $tmp/first-contact/$archive-name
+
+	-V, --virustotal [API_KEY]
+		Get VirusTotal report for given [FILE].
+		If the file it is not submitted no data will not be uploaded
+	
+	-Vun, --virustotal-unlimited-names
+		In the VirusTotal report shows all the names with which the file has been submitted or seen in the wild 
+		If this option is not activated the limit is 10 names.
 
 ```
