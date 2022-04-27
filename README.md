@@ -29,6 +29,11 @@ DESCRIPTION
 	3. Blacklisted strings detection 
 	4. Extraction as archive and perform generic tests for every files
 
+	Tests for RTF files:
+	1. Objects detection (via rtfdump)
+	2. URLs, IPv4 and Domains detection
+	3. Blacklisted strings detection 
+
 	Tests for PDF files:
 	1. JavaScript and Action tags (via pdf-parser)
 	2. JBIG2, Flash and XFA forms (via pdf-parser)
