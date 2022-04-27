@@ -93,7 +93,7 @@ OPTIONS
 		show more informations during execution
 
 	-d, --debug
-		show debugging informations
+		show debugging informations (VirusTotal HTTP responses and complete file test results)
 
 	-c, --checksum
 		Calculate file MD5, SHA1 and SHA256
