@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+#
 # first-contact Copyright 2017, 2022 Luca Reggiannini
 #
 # This program is free software: you can redistribute it and/or modify
@@ -13,7 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-
 import subprocess
 import sys
 import io
@@ -91,7 +92,7 @@ DESCRIPTION
 	1. Macro detection (via oledump, olefile)
 	2. URLs, IPv4 and Domains detection
 	3. Blacklisted strings detection 
-	4. Extraction as archive and perform generic tests for every files
+	4. Extraction as archive with generic tests for every files extracted
 
 	Tests for RTF files:
 	1. Objects detection (via rtfdump)
@@ -108,7 +109,25 @@ DESCRIPTION
 	Generic tests (for every other file type):
 	1. URLs, IPv4 and Domains detection
 	2. Blacklisted strings detection 
-	3. Extraction as archive and perform generic tests for every files
+	3. Extraction as archive with generic tests for every files extracted
+
+MESSAGES TYPE:
+	The program will display various types of messages:
+
+	- Alert   : information that indicates the discovery of active code or elements recognized as malicious within the file.
+	            It could indicate the presence of an infection.
+
+	- Warning : information indicating that an interesting element was found in the file. 
+	            A more in-depth manual analysis is required.
+
+	- Info    : useful information to understand what the program is doing
+
+	- Verbose : more detailed information on the data extracted from the file.
+	            Useful for having a precise dump of information.
+
+	- Debug   : information that does not relate to the analysis.
+	            Useful for analyzing errors and solving problems within the code.
+	            Shows HTTP requests to Virustotal and the outputs of programs used for analysis.
 
 URLS DETECTION
 	Extracts URLs from a file using a regular expression.
@@ -128,7 +147,7 @@ DOMAIN DETECTION
 	
 	Matches <label-N>.<label>.<tld>.
 	Labels consists of letters "a"--"z" (not case sensitive), digits, and the character "-"; maximum length is 63 chars.
-	Labels are separated by the character "."
+	Labels are separated by the character "." (you can have N label where N is an infinite number).
 	The last label must be followed by the TLD.
 	The TLD consists of letters "a"--"z" (not case sensitive), digits, and the character "-"; maximum length is 63 chars.
 	Valid TLDs must be inserted in ./cfg/tlds.cfg (current list last updated on 26-04-2022).
@@ -153,7 +172,7 @@ IPV4 DETECTION
 BLACKLISTED STRINGS
 	Simply searches bad strings (case insensitive) previously entered in the "./cfg/blacklist.cfg" (one per line).
 
-Note: every detections system based on strings or Regex will NOT detect splitted data (for example an URL splitted in various Sheets and "re-assembled" runtime by an Excel 4.0 Macro will not be detected).
+Note: every detections system based on strings or Regex will NOT detect splitted data (for example an URL splitted in various Excel Sheets and "re-assembled" runtime by an Excel 4.0 Macro will NOT be detected).
 
 OPTIONS
 	-h, --help 
@@ -172,11 +191,12 @@ OPTIONS
 		Enable Domains detection
 
 	-f, --force-mime [MIME]
-		Set file MIME manually (automatic MIME detection will be ignored)
+		Set file MIME manually.
+		Automatic MIME detection will be ignored
 
 	-k, --keep-after-extraction
 		Do not delete extracted archives content after analysis.
-		Archive content is extracted in $tmp/first-contact/$archive-name
+		Archive content is extracted in <tmp>/first-contact/<archive-name>
 
 	-V, --virustotal [API_KEY]
 		Get VirusTotal report for given [FILE].
@@ -260,11 +280,15 @@ def __test_MSO_macros(path):
 		else:
 			__warning("Possible active content found")
 
+##########################################################################################
+
 def __test_RTF_objects(path):
 	o = __execute([FILE_PYTHON, FILE_DEPENDENCIES_RTFDUMP, "--objects", path])
 	__debug(o)
 	if not re.search("Check if it is an RTF file", o) and not o == None and o:
 		__alert("Active content found")
+
+##########################################################################################
 
 def __test_PDF_objects(path):
 	o = __execute([FILE_PYTHON, FILE_DEPENDENCIES_PDF_PARSER, "--stats", path])
@@ -280,7 +304,7 @@ def __test_PDF_objects(path):
 	if re.search("Obj", o): # /ObjStm /XObject
 		__info("Object stream detected")
 	if re.search("/Encrypt", o):
-		__info("The PDF document has DRM or needs a password to be read")
+		__warning("The PDF document has DRM or needs a password to be read")
 	if re.search("#", o): # Detect obfuscated object in Hex form; example: /EmbeddedFile to /EmbeddedF#69le
 		__alert("Possible obfuscation attempt detected")
 
@@ -292,6 +316,8 @@ def __test_PDF_objects(path):
 				break
 		else:
 			__alert("Unknow object found '" + object + "'")
+
+##########################################################################################
 
 def __test_ALL_patterns(path):
 	__test_ALL_pattern(path, REGEX_IPV4, WHITELIST_IPV4, "IPv4")
@@ -314,10 +340,12 @@ def __test_ALL_pattern(path, pattern, whitelist, label):
 	foundElements = list(dict.fromkeys(foundElements)) # Remove duplicates
 	if foundElements:
 		if verbose == False:
-			__info(label + " scheme detected in " + str(path)) 
+			__warning(label + " scheme detected in " + str(path)) 
 		else:
 			for foundElement in foundElements:
 				__verbose("Pattern " + label + " found (" + foundElement + ") in " + str(path))
+
+##########################################################################################
 
 def __test_ALL_domains(path, pattern, tlds, whitelist):
 	# If domains Detection is not enabled by the user exit the function immediately
@@ -342,16 +370,20 @@ def __test_ALL_domains(path, pattern, tlds, whitelist):
 	foundElements = list(dict.fromkeys(foundElements)) # Remove duplicates
 	if foundElements:
 		if verbose == False:
-			__info("Domain scheme detected in " + str(path))
+			__warning("Domain scheme detected in " + str(path))
 		else:
 			for foundElement in foundElements:
 				__verbose("Pattern Domain found (" + foundElement + ") in " + str(path))
+
+##########################################################################################
 
 def __test_ALL_strings(path):
 	fileContent = __getFileContent(path)
 	for badstring in BLACKLIST_STRINGS:
 		if re.search(badstring, fileContent, re.IGNORECASE):
 			__warning("Bad string '" + badstring + "' found in " + str(path))
+
+##########################################################################################
 
 def __test_ARCHIVE(path):
 	# Extract the archive in /$tmp/first-contact/$archive-name
@@ -360,7 +392,7 @@ def __test_ARCHIVE(path):
 		__error("A previous file extraction was found: " + str(extractionDirectory) + ". Analysis stopped: please consider deleting the old folder first")
 		exit()
 
-	__verbose("Extracting as archive into " + str(extractionDirectory))
+	__debug("Extracting as archive into " + str(extractionDirectory))
 	try:
 		shutil.unpack_archive(path, extractionDirectory)
 	except: # If can not detect archive format, try ZIP
