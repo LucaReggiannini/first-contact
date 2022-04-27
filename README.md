@@ -27,7 +27,7 @@ DESCRIPTION
 	1. Macro detection (via oledump, olefile)
 	2. URLs, IPv4 and Domains detection
 	3. Blacklisted strings detection 
-	4. Extraction as archive and perform generic tests for every files
+	4. Extraction as archive with generic tests for every files extracted
 
 	Tests for RTF files:
 	1. Objects detection (via rtfdump)
@@ -44,7 +44,25 @@ DESCRIPTION
 	Generic tests (for every other file type):
 	1. URLs, IPv4 and Domains detection
 	2. Blacklisted strings detection 
-	3. Extraction as archive and perform generic tests for every files
+	3. Extraction as archive with generic tests for every files extracted
+
+MESSAGES TYPE:
+	The program will display various types of messages:
+
+	- Alert   : information that indicates the discovery of active code or elements recognized as malicious within the file.
+	            It could indicate the presence of an infection.
+
+	- Warning : information indicating that an interesting element was found in the file. 
+	            A more in-depth manual analysis is required.
+
+	- Info    : useful information to understand what the program is doing
+
+	- Verbose : more detailed information on the data extracted from the file.
+	            Useful for having a precise dump of information.
+
+	- Debug   : information that does not relate to the analysis.
+	            Useful for analyzing errors and solving problems within the code.
+	            Shows HTTP requests to Virustotal and the outputs of programs used for analysis.
 
 URLS DETECTION
 	Extracts URLs from a file using a regular expression.
@@ -64,7 +82,7 @@ DOMAIN DETECTION
 	
 	Matches <label-N>.<label>.<tld>.
 	Labels consists of letters "a"--"z" (not case sensitive), digits, and the character "-"; maximum length is 63 chars.
-	Labels are separated by the character "."
+	Labels are separated by the character "." (you can have N label where N is an infinite number).
 	The last label must be followed by the TLD.
 	The TLD consists of letters "a"--"z" (not case sensitive), digits, and the character "-"; maximum length is 63 chars.
 	Valid TLDs must be inserted in ./cfg/tlds.cfg (current list last updated on 26-04-2022).
@@ -89,7 +107,7 @@ IPV4 DETECTION
 BLACKLISTED STRINGS
 	Simply searches bad strings (case insensitive) previously entered in the "./cfg/blacklist.cfg" (one per line).
 
-Note: every detections system based on strings or Regex will NOT detect splitted data (for example an URL splitted in various Sheets and "re-assembled" runtime by an Excel 4.0 Macro will not be detected).
+Note: every detections system based on strings or Regex will NOT detect splitted data (for example an URL splitted in various Excel Sheets and "re-assembled" runtime by an Excel 4.0 Macro will NOT be detected).
 
 OPTIONS
 	-h, --help 
@@ -108,11 +126,12 @@ OPTIONS
 		Enable Domains detection
 
 	-f, --force-mime [MIME]
-		Set file MIME manually (automatic MIME detection will be ignored)
+		Set file MIME manually.
+		Automatic MIME detection will be ignored
 
 	-k, --keep-after-extraction
 		Do not delete extracted archives content after analysis.
-		Archive content is extracted in $tmp/first-contact/$archive-name
+		Archive content is extracted in <tmp>/first-contact/<archive-name>
 
 	-V, --virustotal [API_KEY]
 		Get VirusTotal report for given [FILE].
