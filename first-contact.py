@@ -100,9 +100,10 @@ DESCRIPTION
 
 	Tests for PDF files:
 	1. JavaScript and Action tags (via pdf-parser)
-	2. JBIG2, Flash and XFA forms (via pdf-parser)
+	2. JBIG2, Flash, XFA forms and Acroform (via pdf-parser)
 	3. URLs, IPv4 and Domains detection
-	4. Blacklisted strings detection 
+	4. Blacklisted strings detection
+	5. Detect unknow or obfuscated objects (a list of known object is in ./cfg/knownPdfObjects.cfg)
 
 	Generic tests (for every other file type):
 	1. URLs, IPv4 and Domains detection
@@ -212,6 +213,7 @@ FILE_WHITELIST_IPV4          = os.path.join(os.path.dirname(__file__), "cfg", "w
 FILE_WHITELIST_DOMAINS       = os.path.join(os.path.dirname(__file__), "cfg", "whitelistDomains.cfg")
 FILE_BLACKLIST_STRINGS       = os.path.join(os.path.dirname(__file__), "cfg", "blacklist.cfg")
 FILE_DOMAINS_TLDS            = os.path.join(os.path.dirname(__file__), "cfg", "tlds.cfg")
+FILE_KNOWN_PDF_OBJECTS       = os.path.join(os.path.dirname(__file__), "cfg", "knownPdfObjects.cfg")
 
 FILE_PYTHON                  = "python3"                                                                                               # Specify your Python executable (basename or path)
 
@@ -224,6 +226,7 @@ WHITELIST_IPV4          = []
 WHITELIST_DOMAINS       = []
 BLACKLIST_STRINGS       = []
 DOMAINS_TLDS            = []
+KNOWN_PDF_OBJECTS       = []
 
 # Populate lists with cfg files content
 
@@ -232,6 +235,7 @@ __loadList(FILE_WHITELIST_IPV4,    WHITELIST_IPV4)
 __loadList(FILE_WHITELIST_DOMAINS, WHITELIST_DOMAINS)
 __loadList(FILE_BLACKLIST_STRINGS, BLACKLIST_STRINGS)
 __loadList(FILE_DOMAINS_TLDS,      DOMAINS_TLDS)
+__loadList(FILE_KNOWN_PDF_OBJECTS, KNOWN_PDF_OBJECTS)
 
 ##########################################################################################
 
@@ -265,10 +269,29 @@ def __test_RTF_objects(path):
 def __test_PDF_objects(path):
 	o = __execute([FILE_PYTHON, FILE_DEPENDENCIES_PDF_PARSER, "--stats", path])
 	__debug(o)
+
+	# Search for known objects
 	if re.search("/JS|/JavaScript|/AA|/OpenAction|/Launch", o):
 		__alert("Active content detected")
-	if re.search("/JBIG2Decode|/RichMedia|/XFA", o):
+	if re.search("/JBIG2Decode|/RichMedia|/XFA|/AcroForm", o):
 		__warning("Interesting content detected")
+	if re.search("/Embedded", o): # /EmbeddedFile /Embeddedfile
+		__alert("Embedded content detected")
+	if re.search("Obj", o): # /ObjStm /XObject
+		__info("Object stream detected")
+	if re.search("/Encrypt", o):
+		__info("The PDF document has DRM or needs a password to be read")
+	if re.search("#", o): # Detect obfuscated object in Hex form; example: /EmbeddedFile to /EmbeddedF#69le
+		__alert("Possible obfuscation attempt detected")
+
+	# Search for unknow objects
+	objects = re.findall(" (.*?)\s\d:\s", o)
+	for object in objects:
+		for knownObject in KNOWN_PDF_OBJECTS:
+			if object == knownObject:
+				break
+		else:
+			__alert("Unknow object found '" + object + "'")
 
 def __test_ALL_patterns(path):
 	__test_ALL_pattern(path, REGEX_IPV4, WHITELIST_IPV4, "IPv4")
@@ -506,10 +529,10 @@ def __main():
 		__help()
 
 	print("")
+	print("ANALYZING   : " + os.path.basename(file))
 
 	if printChecksum:
 		md5, sha1, sha256 = __getHash(file)
-		print("NAME        : " + os.path.basename(file))
 		print("MD5         : " + md5)
 		print("SHA1        : " + sha1)
 		print("SHA256      : " + sha256)
