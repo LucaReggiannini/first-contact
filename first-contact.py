@@ -157,7 +157,7 @@ OPTIONS
 		show more informations during execution
 
 	-d, --debug
-		show debugging informations
+		show debugging informations (VirusTotal HTTP responses and complete file test results)
 
 	-c, --checksum
 		Calculate file MD5, SHA1 and SHA256
@@ -239,12 +239,12 @@ virustotalUnlimitedNames     = False
 
 ##########################################################################################
 
-# TEST FUNCTIONS 
+# TEST FUNCTION
 
 def __test_MSO_macros(path):
 	o = __execute([FILE_PYTHON, FILE_DEPENDENCIES_OLEDUMP, path])
 	__debug(o)
-	if not re.search("no OLE file was found", o):
+	if not re.search("no OLE file was found", o) and not re.search("is not a valid OLE file", o):
 		if re.search(" M | O | E | \! ", o): # 'm' omitted to prevent false positives
 			__alert("Macro detected")
 		else:
