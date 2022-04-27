@@ -36,9 +36,10 @@ DESCRIPTION
 
 	Tests for PDF files:
 	1. JavaScript and Action tags (via pdf-parser)
-	2. JBIG2, Flash and XFA forms (via pdf-parser)
+	2. JBIG2, Flash, XFA forms and Acroform (via pdf-parser)
 	3. URLs, IPv4 and Domains detection
-	4. Blacklisted strings detection 
+	4. Blacklisted strings detection
+	5. Detect unknow or obfuscated objects (a list of known object is in ./cfg/knownPdfObjects.cfg)
 
 	Generic tests (for every other file type):
 	1. URLs, IPv4 and Domains detection
