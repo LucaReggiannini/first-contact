@@ -93,6 +93,11 @@ DESCRIPTION
 	3. Blacklisted strings detection 
 	4. Extraction as archive and perform generic tests for every files
 
+	Tests for RTF files:
+	1. Objects detection (via rtfdump)
+	2. URLs, IPv4 and Domains detection
+	3. Blacklisted strings detection 
+
 	Tests for PDF files:
 	1. JavaScript and Action tags (via pdf-parser)
 	2. JBIG2, Flash and XFA forms (via pdf-parser)
@@ -199,6 +204,7 @@ FOLDER_DEPENDENCIES          = os.path.join(os.path.dirname(__file__), "dependen
 FOLDER_TEMP                  = os.path.join(__getTmp(), "first-contact")                                                               # used to store temp files
 
 FILE_DEPENDENCIES_OLEDUMP    = os.path.join(FOLDER_DEPENDENCIES, "oledump.py")
+FILE_DEPENDENCIES_RTFDUMP    = os.path.join(FOLDER_DEPENDENCIES, "rtfdump.py")
 FILE_DEPENDENCIES_PDF_PARSER = os.path.join(FOLDER_DEPENDENCIES, "pdf-parser.py")
 
 FILE_WHITELIST_URLS          = os.path.join(os.path.dirname(__file__), "cfg", "whitelistUrls.cfg")
@@ -250,6 +256,12 @@ def __test_MSO_macros(path):
 		else:
 			__warning("Possible active content found")
 
+def __test_RTF_objects(path):
+	o = __execute([FILE_PYTHON, FILE_DEPENDENCIES_RTFDUMP, "--objects", path])
+	__debug(o)
+	if not re.search("Check if it is an RTF file", o) and not o == None and o:
+		__alert("Active content found")
+
 def __test_PDF_objects(path):
 	o = __execute([FILE_PYTHON, FILE_DEPENDENCIES_PDF_PARSER, "--stats", path])
 	__debug(o)
@@ -279,7 +291,7 @@ def __test_ALL_pattern(path, pattern, whitelist, label):
 	foundElements = list(dict.fromkeys(foundElements)) # Remove duplicates
 	if foundElements:
 		if verbose == False:
-			__info(label + " scheme detected in " + path) 
+			__info(label + " scheme detected in " + str(path)) 
 		else:
 			for foundElement in foundElements:
 				__verbose("Pattern " + label + " found (" + foundElement + ") in " + str(path))
@@ -526,6 +538,11 @@ def __main():
 	elif re.search("PDF", mime, re.IGNORECASE):
 		__info("Portable Document Format file detected")
 		__test_PDF_objects(file)
+		__test_ALL_patterns(file)
+		__test_ALL_strings(file)
+	elif re.search("rtf", mime, re.IGNORECASE):
+		__info("Rich Text Format file detected")
+		__test_RTF_objects(file)
 		__test_ALL_patterns(file)
 		__test_ALL_strings(file)
 	else:
