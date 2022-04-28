@@ -469,9 +469,22 @@ def __getVirustotalReport(hash):
 
 ##########################################################################################
 
-# CALCULATE FILE HASH
+# CALCULATE STRING HASH
+def __getStringHash(content):
+	contentBytes = str.encode(content)
 
-def __getHash(path):
+	sha1   = hashlib.sha1()
+	sha256 = hashlib.sha256()
+	md5    = hashlib.md5()
+ 
+	sha1.update(contentBytes)
+	sha256.update(contentBytes)
+	md5.update(contentBytes)
+
+	return str(md5.hexdigest()), str(sha1.hexdigest()), str(sha256.hexdigest());
+
+# CALCULATE FILE HASH
+def __getFileHash(path):
 	if not os.path.exists(path):
 		__error("Invalid file given")
 		exit()
@@ -496,6 +509,9 @@ def __getHash(path):
 # START 
 
 def __main():
+	md5, sha1, sha256 = __getStringHash("asd")
+	print(md5)
+
 	# Check if at least one argument is passed
 	if len(sys.argv) == 1:
 		__error("No arguments given")
@@ -564,14 +580,14 @@ def __main():
 	print("ANALYZING   : " + os.path.basename(file))
 
 	if printChecksum:
-		md5, sha1, sha256 = __getHash(file)
+		md5, sha1, sha256 = __getFileHash(file)
 		print("MD5         : " + md5)
 		print("SHA1        : " + sha1)
 		print("SHA256      : " + sha256)
 		print("")
 
 	if virustotalEnabled:
-		md5, sha1, sha256 = __getHash(file)
+		md5, sha1, sha256 = __getFileHash(file)
 		__getVirustotalReport(md5)
 
 	# Get file MIME
