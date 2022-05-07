@@ -32,7 +32,7 @@ FOLDER_TEMP = os.path.join(tempfile.gettempdir(), "first-contact")
 
 def mso_macros(file_path: str) -> None:
     try:
-        output = firstcontact.utils.execute(["python3", "oledump.py", file_path])
+        output = firstcontact.utils.execute(["oledump.py", file_path])
         firstcontact.out.debug(output)
     except Exception as e:
         firstcontact.out.error("Failed to execute mso_macros")
@@ -49,7 +49,7 @@ def mso_macros(file_path: str) -> None:
 
 def rtf_objects(file_path: str) -> None:
     try:
-        output = firstcontact.utils.execute(["python3", "rtfdump.py", "--objects", file_path])
+        output = firstcontact.utils.execute(["rtfdump.py", "--objects", file_path])
         firstcontact.out.debug(output)
     except Exception as e:
         firstcontact.out.error("Failed to execute rtf_objects")
@@ -62,7 +62,7 @@ def rtf_objects(file_path: str) -> None:
 
 def pdf_objects(file_path: str, known_objects: list[str] | None) -> None:
     try:
-        output = firstcontact.utils.execute(["python3", "pdf-parser.py", "--stats", file_path])
+        output = firstcontact.utils.execute(["pdf-parser.py", "--stats", file_path])
         firstcontact.out.debug(output)
     except Exception as e:
         firstcontact.out.error("Failed to execute pdf_objects")
