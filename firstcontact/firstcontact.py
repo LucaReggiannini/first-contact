@@ -254,8 +254,7 @@ FILE_WHITELIST_DOMAINS = os.path.join(os.path.dirname(sys.modules["firstcontact"
 FILE_BLACKLIST_STRINGS = os.path.join(os.path.dirname(sys.modules["firstcontact"].__file__), "config", "blacklist.cfg")
 FILE_DOMAINS_TLDS = os.path.join(os.path.dirname(sys.modules["firstcontact"].__file__), "config", "tlds.cfg")
 FILE_KNOWN_PDF_OBJECTS = os.path.join(os.path.dirname(sys.modules["firstcontact"].__file__), "config", "knownPdfObjects.cfg")
-print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-print(FILE_WHITELIST_URLS)
+
 REGEX_URLS = "([a-zA-Z0-9\+\.\-]+:\/\/.*?)[\<|\>|\"|\{|\}|\||\\|\^|\[|\]|\`|\s|\n]"
 REGEX_IPV4 = "\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}"
 REGEX_DOMAINS = "((?:(?<!\w)[a-zA-Z0-9\-]{1,63}\.)*(?:(?<!\w)[a-zA-Z0-9\-]{1,63})(?:\.(?:[a-zA-Z0-9\-]{1,63})(?!\w)))"
