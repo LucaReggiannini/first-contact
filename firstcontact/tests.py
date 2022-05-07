@@ -284,7 +284,7 @@ def search_strings(file_path: str, blacklist: list[str]) -> None:
     file_content = firstcontact.utils.get_file_content(file_path)
     for bad_string in blacklist:
         if re.search(bad_string, file_content, re.IGNORECASE):
-            firstcontact.out.warning("Bad string {} found in ".format(bad_string, file_path))
+            firstcontact.out.warning("Bad string {} found in {}".format(bad_string, file_path))
 
 
 def test_archive(
