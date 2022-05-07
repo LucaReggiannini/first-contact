@@ -279,3 +279,17 @@ The package contains general module that you can integrate into your custom scri
 `vt`: contains functions to get reports from Virustotal
 
 For further information refer to the comments in the code of the various modules
+
+# Screenshots
+
+Example of analysis (file content + results:
+![demo1](./screens/demo1.png)
+
+Same analysis with VirusTotal report:
+![demo2](./screens/demo2.png)
+
+Example with an executable file:
+![exe](./screens/exe.png)
+
+Example with a maldoc:
+![xls](./screens/xls.png)
