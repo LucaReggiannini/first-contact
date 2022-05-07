@@ -282,7 +282,7 @@ For further information refer to the comments in the code of the various modules
 
 # Screenshots
 
-Example of analysis (file content + results:
+Example of analysis (file content + results):
 ![demo1](./screens/demo1.png)
 
 Same analysis with VirusTotal report:
