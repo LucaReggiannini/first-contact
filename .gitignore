@@ -1,2 +1,4 @@
 samples
 .idea
+__pycache__
+firstcontact/__pycache__
