@@ -30,6 +30,7 @@ setup(name='first-contact',
       author_email='luca.reggiannini@gmail.com',
       url='https://github.com/LucaReggiannini/first-contact',
       packages=['firstcontact'],
+	  include_package_data=True,
       install_requires=[
             'olefile',
             'requests',
