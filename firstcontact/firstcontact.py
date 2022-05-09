@@ -314,7 +314,7 @@ def check_if_valid_public_ip(ip):
         pass
 
 
-def generic_tests(path):
+def generic_tests(path, try_extraction):
     # File report
     get_virustotal_file_report(path)
 
@@ -360,45 +360,46 @@ def generic_tests(path):
     # Strings detection
     firstcontact.tests.search_strings(path, BLACKLIST_STRINGS)
 
-    # Archive tests
-    functions_to_run = [
-        firstcontact.tests.search_pattern,
-        firstcontact.tests.search_pattern,
-        firstcontact.tests.search_domains,
-        firstcontact.tests.search_strings,
-    ]
-    functions_to_run_args = [
-        [path,
-         "URL",
-         REGEX_URLS,
-         WHITELIST_URLS,
-         url_functions_to_run,
-         url_functions_to_run_args,
-         0],
-        [path,
-         "IPv4",
-         REGEX_IPV4,
-         WHITELIST_IPV4,
-         ipv4_functions_to_run,
-         ipv4_functions_to_run_args,
-         0],
-        [path,
-         REGEX_DOMAINS,
-         DOMAINS_TLDS,
-         WHITELIST_DOMAINS,
-         None,
-         None,
-         None],
-        [path, BLACKLIST_STRINGS]
-    ]
-    firstcontact.tests.test_archive(
-        path,
-        False,
-        None,
-        keep_after_extraction,
-        functions_to_run,
-        functions_to_run_args,
-        0)
+    if try_extraction:
+        # Archive tests
+        functions_to_run = [
+            firstcontact.tests.search_pattern,
+            firstcontact.tests.search_pattern,
+            firstcontact.tests.search_domains,
+            firstcontact.tests.search_strings,
+        ]
+        functions_to_run_args = [
+            [path,
+            "URL",
+            REGEX_URLS,
+            WHITELIST_URLS,
+            url_functions_to_run,
+            url_functions_to_run_args,
+            0],
+            [path,
+            "IPv4",
+            REGEX_IPV4,
+            WHITELIST_IPV4,
+            ipv4_functions_to_run,
+            ipv4_functions_to_run_args,
+            0],
+            [path,
+            REGEX_DOMAINS,
+            DOMAINS_TLDS,
+            WHITELIST_DOMAINS,
+            None,
+            None,
+            None],
+            [path, BLACKLIST_STRINGS]
+        ]
+        firstcontact.tests.test_archive(
+            path,
+            False,
+            None,
+            keep_after_extraction,
+            functions_to_run,
+            functions_to_run_args,
+            0)
 
 
 # ________________________________________________________________________________________
@@ -520,18 +521,21 @@ def __main():
     if re.search("Word|Excel|openxmlformats", mime, re.IGNORECASE):
         firstcontact.out.info("MS Office file detected")
         firstcontact.tests.mso_macros(file)
-        generic_tests(file)
+        generic_tests(file, True)
     elif re.search("PDF", mime, re.IGNORECASE):
         firstcontact.out.info("Portable Document Format file detected")
         firstcontact.tests.pdf_objects(file, KNOWN_PDF_OBJECTS)
-        generic_tests(file)
+        generic_tests(file, False)
     elif re.search("rtf", mime, re.IGNORECASE):
         firstcontact.out.info("Rich Text Format file detected")
         firstcontact.tests.rtf_objects(file)
-        generic_tests(file)
+        generic_tests(file, False)
+    elif re.search("text/", mime, re.IGNORECASE):
+        firstcontact.out.info("Text file detected")
+        generic_tests(file, False)
     else:
         firstcontact.out.info("Unsupported file type: Performing generic tests")
-        generic_tests(file)
+        generic_tests(file, True)
 
     firstcontact.out.info("Analysis complete.\n")
 
