@@ -27,7 +27,8 @@ import io  # Used to open files
 import hashlib  # Used to calculate file hashes
 
 
-def get_hash(data: str, is_file: bool) -> tuple[str, str, str]:
+# def get_hash(data: str, is_file: bool) -> tuple[str, str, str]:
+def get_hash(data, is_file):
     """
     Calculates hash of a file or a array of Bytes.
 
@@ -78,13 +79,15 @@ def get_hash(data: str, is_file: bool) -> tuple[str, str, str]:
     return str(md5.hexdigest()), str(sha1.hexdigest()), str(sha256.hexdigest())
 
 
-def get_mime(file_path: str) -> str:
+#def get_mime(file_path: str) -> str:
+def get_mime(file_path):
     m = magic.Magic(mime=True)
     mime = m.from_file(file_path)
     return mime
 
 
-def execute(program: list[str]) -> str:
+#def execute(program: list[str]) -> str:
+def execute(program):
     """
     This function will:
 
@@ -107,7 +110,8 @@ def execute(program: list[str]) -> str:
     return stdout.decode('ascii', 'replace')
 
 
-def load_list(file_path: str, my_list: list) -> list:
+#def load_list(file_path: str, my_list: list) -> list:
+def load_list(file_path, my_list):
     """
     Populate a list with text lines from a text file
     """
@@ -117,7 +121,8 @@ def load_list(file_path: str, my_list: list) -> list:
     return my_list
 
 
-def get_file_content(file_path: str) -> str:
+#def get_file_content(file_path: str) -> str:
+def get_file_content(file_path):
     """
     Get file content in a human-readable form.
 

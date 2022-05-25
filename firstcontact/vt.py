@@ -30,12 +30,18 @@ def separator():
     pass
 
 
+#def get_virustotal_report(
+#        api_key: str,
+#        resource: str,
+#        resource_type: str,
+#        print_if_malicious: bool,
+#        files_unlimited_names: bool | None) -> bool:
 def get_virustotal_report(
-        api_key: str,
-        resource: str,
-        resource_type: str,
-        print_if_malicious: bool,
-        files_unlimited_names: bool | None) -> bool:
+        api_key,
+        resource,
+        resource_type,
+        print_if_malicious,
+        files_unlimited_names):
     """
     Get report for given resource. If the resource is not already on Virustotal no data is uploaded.
 

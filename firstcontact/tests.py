@@ -30,7 +30,8 @@ import firstcontact
 FOLDER_TEMP = os.path.join(tempfile.gettempdir(), "first-contact")
 
 
-def mso_macros(file_path: str) -> None:
+#def mso_macros(file_path: str) -> None:
+def mso_macros(file_path):
     try:
         output = firstcontact.utils.execute(["oledump.py", file_path])
         firstcontact.out.debug(output)
@@ -47,7 +48,8 @@ def mso_macros(file_path: str) -> None:
         firstcontact.out.warning("Possible active content found")
 
 
-def rtf_objects(file_path: str) -> None:
+#def rtf_objects(file_path: str) -> None:
+def rtf_objects(file_path):
     try:
         output = firstcontact.utils.execute(["rtfdump.py", "--objects", file_path])
         firstcontact.out.debug(output)
@@ -60,7 +62,8 @@ def rtf_objects(file_path: str) -> None:
         firstcontact.out.alert("Active content found")
 
 
-def pdf_objects(file_path: str, known_objects: list[str] | None) -> None:
+#def pdf_objects(file_path: str, known_objects: list[str] | None) -> None:
+def pdf_objects(file_path, known_objects):
     try:
         output = firstcontact.utils.execute(["pdf-parser.py", "--stats", file_path])
         firstcontact.out.debug(output)
@@ -94,15 +97,24 @@ def pdf_objects(file_path: str, known_objects: list[str] | None) -> None:
                 firstcontact.out.alert("Unknown object found -> {} <-".format(obj))
 
 
+#def search_pattern(
+#        file_path: str,
+#        pattern_name: str,
+#        pattern: str,
+#        whitelist: list[str] | None,
+#        functions_to_run: list | None,
+#        functions_to_run_args: list[list[str]] | None,
+#        functions_to_run_args_pattern_index: int | None
+#) -> list[str]:
 def search_pattern(
-        file_path: str,
-        pattern_name: str,
-        pattern: str,
-        whitelist: list[str] | None,
-        functions_to_run: list | None,
-        functions_to_run_args: list[list[str]] | None,
-        functions_to_run_args_pattern_index: int | None
-) -> list[str]:
+        file_path,
+        pattern_name,
+        pattern,
+        whitelist,
+        functions_to_run,
+        functions_to_run_args,
+        functions_to_run_args_pattern_index
+):
     """
     Search given Regex pattern inside a file and (optionally) call a function to perform a custom action on matched data
 
@@ -177,16 +189,24 @@ def search_pattern(
 
     return found_elements
 
-
+#def search_domains(
+#        file_path: str,
+#        pattern: str,
+#        tlds: list[str],
+#        whitelist: list[str] | None,
+#        functions_to_run: list | None,
+#        functions_to_run_args: list[list[str]] | None,
+#        functions_to_run_args_domain_index: int | None
+#) -> list:
 def search_domains(
-        file_path: str,
-        pattern: str,
-        tlds: list[str],
-        whitelist: list[str] | None,
-        functions_to_run: list | None,
-        functions_to_run_args: list[list[str]] | None,
-        functions_to_run_args_domain_index: int | None
-) -> list:
+        file_path,
+        pattern,
+        tlds,
+        whitelist,
+        functions_to_run,
+        functions_to_run_args,
+        functions_to_run_args_domain_index
+):
     """
     Search domain using given Regex pattern inside a file and (optionally) call a function to perform a custom action on
     matched data.
@@ -268,7 +288,8 @@ def search_domains(
     return found_elements
 
 
-def search_strings(file_path: str, blacklist: list[str]) -> None:
+#def search_strings(file_path: str, blacklist: list[str]) -> None:
+def search_strings(file_path, blacklist):
     """
     Search blacklisted strings in file (case-insensitive)
 
@@ -287,15 +308,24 @@ def search_strings(file_path: str, blacklist: list[str]) -> None:
             firstcontact.out.warning("Bad string {} found in {}".format(bad_string, file_path))
 
 
+#def test_archive(
+#        file_path: str,
+#        recursion: bool,
+#        recursion_parent_archive_name: str | None,
+#        keep_after_extraction: bool,
+#        functions_to_run: list | None,
+#        functions_to_run_args: list[list[str]] | None,
+#        functions_to_run_args_pattern_index: int | None
+#) -> None:
 def test_archive(
-        file_path: str,
-        recursion: bool,
-        recursion_parent_archive_name: str | None,
-        keep_after_extraction: bool,
-        functions_to_run: list | None,
-        functions_to_run_args: list[list[str]] | None,
-        functions_to_run_args_pattern_index: int | None,
-) -> None:
+        file_path,
+        recursion,
+        recursion_parent_archive_name,
+        keep_after_extraction,
+        functions_to_run,
+        functions_to_run_args,
+        functions_to_run_args_pattern_index
+):
     """
     Extract files from archive and (optionally) call a function to perform a custom action on matched data.
 
