@@ -82,7 +82,7 @@ def get_hash(data, is_file):
 #def get_mime(file_path: str) -> str:
 def get_mime(file_path):
     m = magic.Magic(mime=True)
-    mime = m.from_file(file_path)
+    mime = m.from_file(str(file_path))
     return mime
 
 
