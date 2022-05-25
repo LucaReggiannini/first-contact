@@ -61,6 +61,12 @@ To make `python-magic` work please run the following commands (based on your pla
     OSX Homebrew  : brew install libmagic
     OSX macports  : port install file
 
+# Compatibility
+Currently the oldest Python version supported is 3.6.0 (Dec. 23, 2016):
+https://www.python.org/downloads/release/python-360/
+
+Update: to increase backward compatibility with older versions of Python all forms of *Type Hints* (https://docs.python.org/3/library/typing.html) have been removed. Methods definitions that implemented Type Hints in the past are still visible (commented out) and will be consistent with the current definitions (in this way they can be used as "documentation" and in the future they can be re-implemented at any time).
+
 # How to analyze files
 The main tool you can use to analyze files is module "firstcontact.py" in the Python package "firstcontact"
 
