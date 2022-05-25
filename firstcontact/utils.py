@@ -104,7 +104,8 @@ def execute(program):
 
     process = subprocess.Popen(
         program,
-        stdout=subprocess.PIPE
+        stdout=subprocess.PIPE,
+        shell=True
     )
     stdout = process.communicate()[0]
     return stdout.decode('ascii', 'replace')
