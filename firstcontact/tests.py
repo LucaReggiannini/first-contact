@@ -33,7 +33,6 @@ FOLDER_TEMP = os.path.join(tempfile.gettempdir(), "first-contact")
 #def mso_macros(file_path: str) -> None:
 def mso_macros(file_path):
     try:
-        print("oledump.py " + str(file_path))
         output = firstcontact.utils.execute("oledump.py \"{}\"".format(str(file_path)))
         firstcontact.out.debug(output)
     except Exception as e:
