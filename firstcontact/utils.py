@@ -86,7 +86,7 @@ def get_mime(file_path):
     return mime
 
 
-#def execute(program: list[str]) -> str:
+#def execute(program: str) -> str:
 def execute(program):
     """
     This function will:
@@ -96,19 +96,12 @@ def execute(program):
     3. print output to stdout
 
     Arguments:
-        program: list of arguments to execute
+        program: program + parameters to execute
 
     Examples:
-        output = execute(["ping", "-c", "2", "8.8.8.8"])
+        output = execute("ping -c 2 8.8.8.8")
     """
-
-    process = subprocess.Popen(
-        program,
-        stdout=subprocess.PIPE,
-        shell=True
-    )
-    stdout = process.communicate()[0]
-    return stdout.decode('ascii', 'replace')
+    return str(subprocess.check_output(program, shell=True).decode('utf-8'))
 
 
 #def load_list(file_path: str, my_list: list) -> list:
