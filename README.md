@@ -2,8 +2,8 @@
 first-contact Copyright 2017, 2022 Luca Reggiannini
 
 This program is free software distributed under the GNU General Public License.
-You should have received a copy of the GNU General Public License
-along with this program (see "LICENSE" file).  If not, see <http://www.gnu.org/licenses/>.
+
+You should have received a copy of the GNU General Public License along with this program (see "LICENSE" file). If not, see <http://www.gnu.org/licenses/>.
 
 This file is part of the "first-contact" project.
 Main repository: https://github.com/LucaReggiannini/first-contact
