@@ -101,8 +101,23 @@ def execute(program):
     Examples:
         output = execute("ping -c 2 8.8.8.8")
     """
-    return str(subprocess.check_output(program, shell=True).decode('utf-8'))
 
+    # Some successful command will return a non-zero exit status.
+    # In this cases "check_output" will generate an Exception
+    # See: https://docs.python.org/3/library/subprocess.html#subprocess.check_output
+    #
+    # "If the return code was non-zero it raises a CalledProcessError. 
+    #  The CalledProcessError object will have the return code in the 
+    #  returncode attribute and any output in the output attribute.
+    # 
+    #  This is equivalent to:
+    #  run(..., check=True, stdout=PIPE).stdout"
+    # 
+    # To prevent this "run" with "check=False" will be used.
+    # Other parameters are adapted.
+
+    # return str(subprocess.check_output(program, shell=True).decode('utf-8'))
+    return str(subprocess.run(program, shell=True, check=False, encoding="utf-8", text=True))
 
 #def load_list(file_path: str, my_list: list) -> list:
 def load_list(file_path, my_list):
