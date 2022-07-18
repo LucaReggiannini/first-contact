@@ -117,7 +117,8 @@ def execute(program):
     # Other parameters are adapted.
 
     # return str(subprocess.check_output(program, shell=True).decode('utf-8'))
-    return str(subprocess.run(program, shell=True, check=False, encoding="utf-8", text=True))
+    output = subprocess.run(program, shell=True,  stdout=subprocess.PIPE, check=False, encoding="utf-8", text=True)
+    return output.stdout
 
 #def load_list(file_path: str, my_list: list) -> list:
 def load_list(file_path, my_list):
